@@ -32,7 +32,7 @@ func setupDB() *sql.DB {
 }
 
 type Releases struct {
-	ID                      string    `json:"movieid"`
+	ID                      string    `json:"ID"`
 	Features_in_Release     string    `json:"Features_in_Release"`
 	PR_link                 string    `json:"PR_link"`
 	Release_Date            time.Time `json:"Release_Date"`
@@ -68,7 +68,7 @@ func main() {
 
 	// Delete a specific releases by the movieID
 	router.HandleFunc("/releases/{releasesid}", DeleteMovie).Methods("DELETE")
-
+	router.HandleFunc("/releases/service/{service}", GetReleaseService).Methods("POST")
 	// Delete all releases
 	router.HandleFunc("/releases/", DeleteMovies).Methods("DELETE")
 
@@ -227,16 +227,64 @@ func CreateRelease(w http.ResponseWriter, r *http.Request) {
 
 		printMessage("Inserting movie into DB")
 
-		fmt.Println("Inserting new movie with ID: " + ID + " and name: " + Features_in_Release)
+		fmt.Println("Inserting new releases with ID: " + ID + " and name: " + Features_in_Release)
 
 		var lastInsertID int
-		err := db.QueryRow("INSERT INTO movies(features_in_release , pr_link , release_date , release_cluster , micro_services , major_release , migration_required , documentation_completed , migration_hash , author , id , comment ) VALUES($1, $2, $3,$4,$5,$6,$7,$8,$9,$10,$11,$12) returning id;", Features_in_Release, PR_link, Release_Date, Release_Cluster, Micro_Services, Major_Release, Migration_Required, Documentation_Completed, Migration_hash, Author, ID, comment).Scan(&lastInsertID)
+		err := db.QueryRow("INSERT INTO releases(features_in_release , pr_link , release_date , release_cluster , micro_services , major_release , migration_required , documentation_completed , migration_hash , author , id , comment ) VALUES($1, $2, $3,$4,$5,$6,$7,$8,$9,$10,$11,$12) returning id;", Features_in_Release, PR_link, Release_Date, Release_Cluster, Micro_Services, Major_Release, Migration_Required, Documentation_Completed, Migration_hash, Author, ID, comment).Scan(&lastInsertID)
 
 		// check errors
 		checkErr(err)
 
 		response = JsonResponse{Type: "success", Message: "The release has been inserted successfully!"}
 	}
+
+	json.NewEncoder(w).Encode(response)
+}
+func GetReleaseService(w http.ResponseWriter, r *http.Request) {
+	params := mux.Vars(r)
+
+	service := params["service"]
+	db := setupDB()
+
+	printMessage("Getting service..." + service)
+
+	query := "SELECT * FROM releases WHERE Micro_Services LIKE '" + service + "' ORDER BY Release_Date DESC;"
+	rows, err := db.Query(query)
+	// check errors
+	checkErr(err)
+
+	// var response []JsonResponse
+	var releases []Releases
+
+	// Foreach movie
+	for rows.Next() {
+		var ID string
+		var Features_in_Release string
+		var PR_link string
+		var Release_Date time.Time
+		var Release_Cluster string
+		var Micro_Services string
+		var Major_Release bool
+		var Migration_Required bool
+		var Documentation_Completed bool
+		var Migration_hash string
+		var Author string
+		var comment string
+
+		err = rows.Scan(&Features_in_Release, &PR_link, &Release_Date, &Release_Cluster, &Micro_Services,
+			&Major_Release, &Migration_Required, &Documentation_Completed, &Migration_hash, &Author, &ID, &comment)
+		fmt.Println("Release_Date")
+		fmt.Println(Release_Date)
+		fmt.Println("Release_Date type is -- ")
+		fmt.Println(reflect.ValueOf(Release_Date).Kind())
+		// check errors
+		checkErr(err)
+		releases = append(releases, Releases{ID: ID, Features_in_Release: Features_in_Release, PR_link: PR_link, Release_Date: Release_Date, Release_Cluster: Release_Cluster, Micro_Services: Micro_Services, Major_Release: Major_Release,
+			Migration_Required: Migration_Required, Documentation_Completed: Documentation_Completed, Migration_hash: Migration_hash, Author: Author, comment: comment})
+	}
+	fmt.Println("data we send is ---- ")
+	fmt.Println(releases)
+	var response = JsonResponse{Type: "success", Data: releases}
 
 	json.NewEncoder(w).Encode(response)
 }
